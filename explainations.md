@@ -1,3 +1,14 @@
+# Code Explaination
+# Table of Contents
+
+1. [`timer.c`](#timer-c)
+   - [Comparator: `wakeup_cmp`](#wakeup_cmp)
+   - [Putting a Thread to Sleep: `timer_sleep`](#timer_sleep)
+   - [Waking Threads on Each Tick: `timer_interrupt`](#timer_interrupt) 
+   - [Summary](#summary)
+   
+---
+
 # 1. `timer.c`
 ## `wakeup_cmp`
 ```c
