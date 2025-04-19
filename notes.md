@@ -20,13 +20,14 @@ git clone https://github.com/youssef-omarrr/PintOS_project.git
 cd PintOS_project
 ```
 
-### 4. Copy the Image ID from Docker Desktop Images
+### 5. Copy the Image ID from Docker Desktop Images
 ![image](https://github.com/user-attachments/assets/3f7dfd41-a2e4-4bd0-b037-8f0f3a512871)
 
 
 
-### 5. Run the Docker Container with the image ID
+### 6. Run the Docker Container with the image ID
 - **Replace `<ImageID>` with your Image ID**
+- RUN FROM **THE ROOT** OF THE REPO FOLDER **DONT** CD TO `CSEx61-dockerized-pintos`
 ```bash
 docker run --platform linux/amd64 --rm -it -v "$(pwd)/CSEx61-dockerized-pintos:/root/pintos " <ImageID>
 ```
