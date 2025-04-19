@@ -1,12 +1,37 @@
-## 0. installation notes:
-### In step 5:
-- **DO NOT** go to the repo folder dir, stay where you are.
-- copy this command (the one in the repo is not working):
-```shell
-docker run --platform linux/amd64 --rm -it -v "$(pwd)/CSEx61-dockerized-pintos:/root/pintos " 
-```
-then paste the **image ID** from docker
+## 0. Installation:
 
+### 1. Install Docker Desktop 
+- From [This Link](https://www.docker.com/products/docker-desktop/)
+
+### 2. Pull the PintOs image sajedalmorsy/pintos:1.0 from Docker Hub:
+```bash
+docker pull sajedalmorsy/pintos:1.0 
+```
+
+### 3. Clone the current Repo 
+
+```bash
+git clone https://github.com/youssef-omarrr/PintOS_project.git
+```
+
+### 4. cd to the repo folder **Not the PintOS folder**
+
+```bash
+cd PintOS_project
+```
+
+### 4. Copy the Image ID from Docker Desktop Images
+![image](https://github.com/user-attachments/assets/3f7dfd41-a2e4-4bd0-b037-8f0f3a512871)
+
+
+
+### 5. Run the Docker Container with the image ID
+- **Replace `<ImageID>` with your Image ID**
+```bash
+docker run --platform linux/amd64 --rm -it -v "$(pwd)/CSEx61-dockerized-pintos:/root/pintos " <ImageID>
+```
+
+---
 
 ## 1. timer.c
 - change `timer_sleep()` function (remove the bust waiting "while loop"), one way to do it is using **semaphores**.
