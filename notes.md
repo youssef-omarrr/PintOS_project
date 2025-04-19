@@ -31,6 +31,9 @@ cd PintOS_project
 docker run --platform linux/amd64 --rm -it -v "$(pwd)/CSEx61-dockerized-pintos:/root/pintos " <ImageID>
 ```
 
+### 6. Now you are running the Container in Docker 
+![image](https://github.com/user-attachments/assets/072c248c-9237-4c64-bcea-3af8ea5a39a6)
+
 ---
 
 ## 1. timer.c
