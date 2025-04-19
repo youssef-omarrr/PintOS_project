@@ -223,3 +223,9 @@ functions to implement in priority donation
 **35:56 [Play](https://app.videonotebook.com/notebooks/56b17ffb-1634-4e6b-88aa-346d91ef1d4b/video/61c6c96b-91c7-4f56-b9cd-29f490c1cbda?noteId=1edc227d-cdf0-4d71-9d67-78e2f7db34fc&time=35:56&type=T)**
 
 ---
+
+
+### Idle_thread
+
+In PintOS, idle_thread is a special kernel thread that runs when no other threads are ready to run. It's basically the OS's way of saying:
+"I have nothing to do right now, so I'll just chill until something happens."
