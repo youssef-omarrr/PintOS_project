@@ -32,10 +32,19 @@ cd PintOS_project
 docker run --platform linux/amd64 --rm -it -v "$(pwd)/CSEx61-dockerized-pintos:/root/pintos " <ImageID>
 ```
 
-### 6. Now you are running the Container in Docker 
+### 7. Now you are running the Container in Docker 
 ![image](https://github.com/user-attachments/assets/072c248c-9237-4c64-bcea-3af8ea5a39a6)
 
 ---
+## Important Links
+
+- [Introduction - Stanford](https://web.stanford.edu/~ouster/cgi-bin/cs140-spring20/pintos/pintos_1.html#SEC1)
+- [Threads - Stanford](https://web.stanford.edu/~ouster/cgi-bin/cs140-spring20/pintos/pintos_2.html#SEC15)
+- [Advanced Scheduler - Stanford](https://web.stanford.edu/~ouster/cgi-bin/cs140-spring20/pintos/pintos_7.html#SEC131)
+
+
+
+--- 
 
 ## 1. timer.c
 - change `timer_sleep()` function (remove the bust waiting "while loop"), one way to do it is using **semaphores**.
