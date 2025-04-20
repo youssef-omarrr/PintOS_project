@@ -19,7 +19,6 @@
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
-#define MAX(a, b) ((a) > (b) ? (a) : (b)) // @Ali Added this macro for Compare function
 
 
 /* List of processes in THREAD_READY state, that is, processes
@@ -97,7 +96,7 @@ priority_cmp(const struct list_elem *a, const struct list_elem *b)
   const struct thread *eb = list_entry(b, struct thread, elem);
 
   // Compare the wakeup_tick values to determine the order.
-  return MAX(ea->priority, ea->priority); 
+  return ea->priority > eb->priority;
 }
 
 void
@@ -261,6 +260,13 @@ thread_unblock (struct thread *t)
 
   // @Ali Added the Cmparator function for priority
   list_insert_ordered(&ready_list, &t->elem, priority_cmp, NULL);
+  
+  // If the unblocked thread has higher priority, yield
+  if (!intr_context() && thread_current() != idle_thread && 
+  t->priority > thread_current()->priority)
+  {
+      thread_yield();
+  }
   
   t->status = THREAD_READY;
   intr_set_level (old_level);
