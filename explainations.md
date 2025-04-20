@@ -157,3 +157,36 @@ In summary, this function ensures that sleeping threads are woken up at the corr
 - **No busy‑waiting:** Threads don’t spin in a loop checking the clock; they’re blocked until the right moment.  
 - **Efficiency:** The list stays sorted, so the interrupt handler only ever looks at the front element(s)—constant‑time per wakeup.  
 - **Safety:** Briefly turning off interrupts prevents two CPUs (or an interrupt and a normal context) from corrupting the shared list.
+
+# 3. Advanced schedular
+## 1. Nice value
+**Steps to Implement `thread_set_nice(int new_nice)`:**
+1. **Update** the `nice` value of the current thread.
+2. **Recalculate** the thread's priority based on the new nice value.
+3. **Yield the CPU** if the thread's priority changes and it is no longer the *highest-priority* thread.
+
+- `thread_get_nice()`: just returns the nice value of the current thread.
+  
+## Priority Calculation
+The priority is calculated using the following formula:
+```
+priority = PRI_MAX - (recent_cpu / 4) - (nice * 2) 
+``` 
+
+**Steps in `calculate_priority`:**
+1. **Assert MLFQS is enabled**
+    - Check that `thread_mlfqs` is true before calculating
+
+2. **Calculate Components**
+    - Use the thread's `recent_cpu` value
+    - Divide `recent_cpu` by 4
+    - Multiply `nice` value by 2
+    - Subtract both from `PRI_MAX`
+
+3. **Clamp the Result**
+    - Ensure priority stays within valid range
+    - If `priority > PRI_MAX`, set to `PRI_MAX`
+    - If `priority < PRI_MIN`, set to `PRI_MIN`
+
+4. **Return Final Priority**
+    - The resulting value becomes the thread's **new priority**

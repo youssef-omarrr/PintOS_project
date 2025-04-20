@@ -98,6 +98,8 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+
+  // init 
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -181,6 +183,10 @@ thread_create (const char *name, int priority,
 
   /* Initialize thread. */
   init_thread (t, name, priority);
+  // === NEW == //
+  // Inherit the niceness value from the parent thread
+  t -> nice = thread_current()->nice;
+  // === NEW == //
   tid = t->tid = allocate_tid ();
 
   /* Stack frame for kernel_thread(). */
@@ -345,19 +351,53 @@ thread_get_priority (void)
   return thread_current ()->priority;
 }
 
+/* Calculates the priority of a thread based on its nice value and recent_cpu. */
+int
+calculate_priority (struct thread *t) 
+{
+  ASSERT (thread_mlfqs); // Ensure that the multi-level feedback queue scheduler is enabled.
+
+  // Calculate the priority based on the formula:
+  // priority = PRI_MAX - (recent_cpu / 4) - (nice * 2)
+  int priority = PRI_MAX - (t->recent_cpu / 4) - (t->nice * 2);
+
+  // Clamp the priority to be within the valid range [PRI_MIN, PRI_MAX].
+  if (priority > PRI_MAX)
+    priority = PRI_MAX;
+  if (priority < PRI_MIN)
+    priority = PRI_MIN;
+
+  return priority; // Return the calculated priority.
+}
+
 /* Sets the current thread's nice value to NICE. */
 void
-thread_set_nice (int nice UNUSED) 
+thread_set_nice (int new_nice) 
 {
-  /* Not yet implemented. */
+  // Ensure the nice value is within the valid range [-20, 20].
+  ASSERT (new_nice >= -20 && new_nice <= 20);
+
+  // Get the currently running thread.
+  struct thread *current = thread_current();
+
+  // Update the thread's nice value to the new value.
+  current->nice = new_nice;
+
+  // If the multi-level feedback queue scheduler (MLFQS) is enabled:
+  if (thread_mlfqs) {
+    // Recalculate the thread's priority based on the updated nice value.
+    current->priority = calculate_priority(current);
+
+    // Yield the CPU if the current thread is no longer the highest-priority thread.
+    thread_yield();
+  }
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return thread_current()->nice;
 }
 
 /* Returns 100 times the system load average. */
@@ -463,6 +503,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+
+  ////////////======= NEW =======////////////////////
+  // init the intial thread niceness value to "zero"
+  t->nice = 0;
+  ////////////======= NEW =======////////////////////
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

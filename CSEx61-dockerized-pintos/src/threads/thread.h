@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
+#include "fixed-point.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -100,6 +101,14 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+
+   ///////////====== NEW =========//////////////
+   //  Niceness value [-20:20]
+    int nice; 
+   // recent_cpu in fixed point representation
+    fp_t recent_cpu;
+
+   ///////////====== NEW =========//////////////
   };
 
 /* If false (default), use round-robin scheduler.
@@ -132,6 +141,9 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
+// === NEW == //
+int calculate_priority (struct thread *t);
+// === NEW == //
 
 int thread_get_nice (void);
 void thread_set_nice (int);
