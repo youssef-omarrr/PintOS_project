@@ -32,6 +32,19 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 
+// @Yousef Added the Cmparator function for priority    
+static bool
+priority_cmp(const struct list_elem *a, const struct list_elem *b)
+{
+
+  // Retrieve the sleep_element structures from the list elements.
+  const struct thread *ea = list_entry(a, struct thread, elem);
+  const struct thread *eb = list_entry(b, struct thread, elem);
+
+  // Compare the wakeup_tick values to determine the order.
+  return ea->priority > eb->priority;
+}
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -41,6 +54,7 @@
 
    - up or "V": increment the value (and wake up one waiting
      thread, if any). */
+     
 void
 sema_init (struct semaphore *sema, unsigned value) 
 {
