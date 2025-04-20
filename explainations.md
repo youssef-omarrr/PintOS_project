@@ -168,12 +168,16 @@ In summary, this function ensures that sleeping threads are woken up at the corr
 
 # 3. Advanced schedular
 ## 1. Nice value
+- The *initial thread* starts with a `nice` value of **zero** (which we change in the `init_thread()` function).
+- Other threads start with a nice value **inherited** from their *parent* thread (which we change in the `create_thread()` function).
+- `thread_get_nice()`: just returns the nice value of the current thread.
+  
 **Steps to Implement `thread_set_nice(int new_nice)`:**
 1. **Update** the `nice` value of the current thread.
 2. **Recalculate** the thread's priority based on the new nice value.
 3. **Yield the CPU** if the thread's priority changes and it is no longer the *highest-priority* thread.
 
-- `thread_get_nice()`: just returns the nice value of the current thread.
+
 
 ## 2. Recent CPU
 ## 3. Load Average
