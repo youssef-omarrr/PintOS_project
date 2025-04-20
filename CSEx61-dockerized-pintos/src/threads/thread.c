@@ -507,7 +507,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
-  list_push_back (&all_list, &t->allelem);
+  /*============== NEW ===================*/
+  //@Yousef added insertion of the initialized thread to all_list ordered 
+  list_insert_ordered(&all_list, &t->allelem, priority_cmp, NULL);
+  /*============== NEW ===================*/
+  // list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
 }
 
