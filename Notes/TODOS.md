@@ -7,29 +7,29 @@
 
 ## Normal Scheduler 
 
-### [ ] `Thread_Create()`
+### [X] `Thread_Create()`
 1. insert **Ordered** in `ready_list`.
 2. Compare the `P_new` and `P_Cur`
 3. Call `schedule()` if `P_new` > `P_Cur`
 
-### [ ] `Thread_unblock()`
+### [X] `Thread_unblock()`
 - This is used in the thread_create to unblock the thread i.e. put it in the ready Q.
 1. Should insert to `ready_list` in P order.
 
 
-### [ ] `Thread_yield()`
+### [X] `Thread_yield()`
 1. Should insert to `ready_list` in P order.
 
 
-### [ ] `Thread_set_priority()`
+### [X] `Thread_set_priority()`
 1. Should reorder the `ready_list` after setting P.
 
 
-### [ ] `sema_down()`
+### [X] `sema_down()`
 1. Sort waiters in P order.
 
 
-### [ ] `cond_wait()`
+### [X] `cond_wait()`
 1. Sort waiters in P order.
 
 --- 

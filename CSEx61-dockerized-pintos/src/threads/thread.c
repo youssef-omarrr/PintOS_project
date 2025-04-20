@@ -19,6 +19,8 @@
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
+#define MAX(a, b) ((a) > (b) ? (a) : (b)) // @Ali Added this macro for Compare function
+
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
@@ -84,6 +86,20 @@ static tid_t allocate_tid (void);
 
    It is not safe to call thread_current() until this function
    finishes. */
+
+// @Ali Added the Cmparator function for priority    
+static bool
+priority_cmp(const struct list_elem *a, const struct list_elem *b)
+{
+
+  // Retrieve the sleep_element structures from the list elements.
+  const struct thread *ea = list_entry(a, struct thread, elem);
+  const struct thread *eb = list_entry(b, struct thread, elem);
+
+  // Compare the wakeup_tick values to determine the order.
+  return MAX(ea->priority, ea->priority); 
+}
+
 void
 thread_init (void) 
 {
@@ -201,6 +217,11 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  /* @Ali If the new thread has higher priority than the current
+     thread, yield the CPU. */
+  if (priority > thread_current()->priority)
+    thread_yield ();
+
   return tid;
 }
 
@@ -237,7 +258,10 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+
+  // @Ali Added the Cmparator function for priority
+  list_insert_ordered(&ready_list, &t->elem, priority_cmp, NULL);
+  
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -307,8 +331,13 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
+  
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+  {
+    // @Ali Added the Cmparator function for priority
+    list_insert_ordered(&ready_list, &cur->elem, priority_cmp, NULL);
+  }
+  
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -336,6 +365,19 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+
+  // @Ali Added Sort the ready list based on the new priority and preemption
+  list_sort(&ready_list, priority_cmp, NULL);
+
+  if (!list_empty(&ready_list))
+  {
+    struct thread *next_thread = list_entry(list_front(&ready_list), struct thread, elem);
+    if (next_thread->priority > thread_get_priority())
+    {
+      thread_yield();
+    }
+  }
+  
 }
 
 /* Returns the current thread's priority. */
