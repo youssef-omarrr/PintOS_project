@@ -169,7 +169,7 @@ void thread_tick(void)
   {
     // Increment recent_cpu for running thread if not idle
     if (t != idle_thread)
-      t->recent_cpu = FP_ADD_INT(t->recent_cpu, 1);
+      t->recent_cpu = FP_PLUS_INT(t->recent_cpu, 1);
 
     // Every fourth tick, recalculate priorities
     if (timer_ticks() % 4 == 0)
@@ -556,13 +556,13 @@ void calculate_recent_cpu(struct thread *t)
     /* Calculate (2*load_avg)/(2*load_avg + 1) */
     fp_t coeff = FP_DIV(
         FP_MULT_INT(load_avg, 2),
-        FP_ADD_INT(FP_MULT_INT(load_avg, 2), 1));
+        FP_PLUS_INT(FP_MULT_INT(load_avg, 2), 1));
 
     /* Calculate (coefficient * recent_cpu) */
     fp_t weighted_cpu = FP_MULT(coeff, t->recent_cpu);
 
     /* Add nice value to get final recent_cpu */
-    t->recent_cpu = FP_ADD_INT(weighted_cpu, t->nice);
+    t->recent_cpu = FP_PLUS_INT(weighted_cpu, t->nice);
   }
 }
 
