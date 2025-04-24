@@ -211,8 +211,9 @@ tid_t thread_create(const char *name, int priority,
   /* Initialize thread. */
   init_thread(t, name, priority);
   // === NEW == //
-  // Inherit the niceness value from the parent thread
+  // Inherit the niceness value and recent_cpu from the parent thread
   t->nice = thread_current()->nice;
+  t->recent_cpu = thread_current()->recent_cpu;
   // === NEW == //
   tid = t->tid = allocate_tid();
 
