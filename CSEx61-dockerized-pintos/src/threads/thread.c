@@ -453,7 +453,7 @@ int calculate_priority(struct thread *t)
 
   // Calculate the priority based on the formula:
   // priority = PRI_MAX - (recent_cpu / 4) - (nice * 2)
-  int priority = PRI_MAX - FP_TO_INT(FP_DIV(t->recent_cpu, INT_TO_FP(4))) - (t->nice * 2);
+  int priority = PRI_MAX - FP_TO_INT_NEAREST(FP_DIV(t->recent_cpu, INT_TO_FP(4))) - (t->nice * 2);
   
   // Clamp the priority to be within the valid range [PRI_MIN, PRI_MAX].
   if (priority > PRI_MAX)
