@@ -133,7 +133,10 @@ void timer_sleep(int64_t ticks_to_sleep)
   enum intr_level old_level = intr_disable(); // Disable interrupts to modify the shared sleep_list safely.
   /* Insert in sorted order by wakeup_tick. */
   list_insert_ordered(&sleep_list, &sleeper.element, wakeup_cmp, NULL); // Add the sleeper to the sleep_list in sorted order.
-  intr_set_level(old_level);                                            // Restore the previous interrupt level.
+
+  thread_block(); // Set the thread's state to BLOCKED.
+
+  intr_set_level(old_level); // Restore the previous interrupt level.
 
   /* Block until timer_interrupt ups our semaphore. */
   sema_down(&sleeper.sema); // Block the thread until it is woken up by the timer interrupt.
