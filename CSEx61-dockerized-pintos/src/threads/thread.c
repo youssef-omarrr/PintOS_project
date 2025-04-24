@@ -151,16 +151,24 @@ void thread_tick(void)
   ////////////////////////// NEW //////////////////////////
   if (thread_mlfqs)
   {
-    int64_t ticks = timer_ticks();
+    // Increment recent_cpu for running thread if not idle
+    if (t != idle_thread)
+      t->recent_cpu = FP_ADD_INT(t->recent_cpu, 1);
 
-    // Every second (every 100 ticks), update load_avg and recent_cpu
-    if (ticks % TIMER_FREQ == 0)
+    // Every fourth tick, recalculate priorities
+    if (timer_ticks() % 4 == 0)
+      thread_foreach(&calculate_priority, NULL);
+
+    // Every second (TIMER_FREQ ticks), update load_avg and recent_cpu
+    if (timer_ticks() % TIMER_FREQ == 0)
     {
       load_avg = calculate_load_avg();
+      thread_foreach(&calculate_recent_cpu, NULL);
+      thread_foreach(&calculate_priority, NULL);
     }
   }
-  ////////////////////////// NEW //////////////////////////
 }
+////////////////////////// NEW //////////////////////////
 
 /* Prints thread statistics. */
 void thread_print_stats(void)
@@ -260,8 +268,19 @@ void thread_unblock(struct thread *t)
 
   old_level = intr_disable();
   ASSERT(t->status == THREAD_BLOCKED);
-  list_push_back(&ready_list, &t->elem);
+  /////////////////======== NEW =======//////////////////
+  // Use list_insert_ordered to maintain priority ordering
+  list_insert_ordered(&ready_list, &t->elem,
+                      (list_less_func *)&thread_priority_compare, NULL);
+  /////////////////======== NEW =======//////////////////
   t->status = THREAD_READY;
+
+  // After unblocking a thread, it should check if the unblocked thread has higher priority
+  // than the current thread and yield if necessary:
+  if (thread_current() != idle_thread &&
+      t->priority > thread_current()->priority)
+    thread_yield();
+
   intr_set_level(old_level);
 }
 
@@ -328,7 +347,11 @@ void thread_yield(void)
 
   old_level = intr_disable();
   if (cur != idle_thread)
-    list_push_back(&ready_list, &cur->elem);
+    /////////////////======== NEW =======//////////////////
+    // Use list_insert_ordered to maintain priority ordering
+    list_insert_ordered(&ready_list, &cur->elem,
+                        (list_less_func *)&thread_priority_compare, NULL);
+  /////////////////======== NEW =======//////////////////
   cur->status = THREAD_READY;
   schedule();
   intr_set_level(old_level);
@@ -369,13 +392,24 @@ int calculate_priority(struct thread *t)
 
   // Calculate the priority based on the formula:
   // priority = PRI_MAX - (recent_cpu / 4) - (nice * 2)
-  int priority = PRI_MAX - (t->recent_cpu / 4) - (t->nice * 2);
-
+  int priority = PRI_MAX - FP_TO_INT(FP_DIV(t->recent_cpu, INT_TO_FP(4))) - (t->nice * 2);
+  
   // Clamp the priority to be within the valid range [PRI_MIN, PRI_MAX].
   if (priority > PRI_MAX)
     priority = PRI_MAX;
   if (priority < PRI_MIN)
     priority = PRI_MIN;
+
+  // Update the thread's priority
+  t->priority = priority;
+
+  // If this is the current thread and it's no longer the highest priority,
+  // yield. Changes were made to "thread_unblock()" and "thread_yield()" to make the "read_list" ordered
+  if (t == thread_current() && !list_empty(&ready_list) &&
+      t->priority < list_entry(list_front(&ready_list),
+                               struct thread, elem)
+                        ->priority)
+    thread_yield();
 
   return priority; // Return the calculated priority.
 }
@@ -431,11 +465,44 @@ fp_t calculate_load_avg(void)
       FP_MULT_INT(coeff_1_60, ready_threads));
 }
 
-/* Returns 100 times the current thread's recent_cpu value. */
+/* Returns 100 times the current thread's recent_cpu value.
+  This function is used to query the recent CPU usage of the currently running thread.
+  The value is scaled up by 100 to provide two decimal places of precision.
+
+  For example, if recent_cpu is 2.5, this function will return 250.
+  Only works when the MLFQS (Multi-Level Feedback Queue Scheduler) is enabled. */
 int thread_get_recent_cpu(void)
 {
-  /* Not yet implemented. */
-  return 0;
+  ASSERT(thread_mlfqs); // Verify MLFQS scheduler is active
+
+  // Get pointer to currently running thread
+  struct thread *current = thread_current();
+
+  // Convert recent_cpu to integer after multiplying by 100
+  // This preserves 2 decimal places when converting from fixed-point
+  return FP_TO_INT_NEAREST(FP_MULT_INT(current->recent_cpu, 100));
+}
+
+/* Calculates the recent_cpu value for a thread using the formula:
+   recent_cpu = (2*load_avg)/(2*load_avg + 1) * recent_cpu + nice */
+void calculate_recent_cpu(struct thread *t)
+{
+  ASSERT(thread_mlfqs); // Ensure MLFQS scheduler is enabled
+  ASSERT(t != NULL);    // Ensure thread pointer is valid
+
+  if (t != idle_thread)
+  {
+    /* Calculate (2*load_avg)/(2*load_avg + 1) */
+    fp_t coeff = FP_DIV(
+        FP_MULT_INT(load_avg, 2),
+        FP_ADD_INT(FP_MULT_INT(load_avg, 2), 1));
+
+    /* Calculate (coefficient * recent_cpu) */
+    fp_t weighted_cpu = FP_MULT(coeff, t->recent_cpu);
+
+    /* Add nice value to get final recent_cpu */
+    t->recent_cpu = FP_ADD_INT(weighted_cpu, t->nice);
+  }
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -527,8 +594,9 @@ init_thread(struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
 
   ////////////======= NEW =======////////////////////
-  // init the intial thread niceness value to "zero"
+  // init the intial thread niceness value and recent_cpu to "zero"
   t->nice = 0;
+  t->recent_cpu = INT_TO_FP(0);
   ////////////======= NEW =======////////////////////
 
   old_level = intr_disable();
@@ -648,3 +716,13 @@ allocate_tid(void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof(struct thread, stack);
+
+// Used for the ordering of the ready_list
+bool thread_priority_compare(const struct list_elem *a,
+                             const struct list_elem *b,
+                             void *aux UNUSED)
+{
+  struct thread *ta = list_entry(a, struct thread, elem);
+  struct thread *tb = list_entry(b, struct thread, elem);
+  return ta->priority > tb->priority;
+}

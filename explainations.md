@@ -177,13 +177,58 @@ In summary, this function ensures that sleeping threads are woken up at the corr
 2. **Recalculate** the thread's priority based on the new nice value.
 3. **Yield the CPU** if the thread's priority changes and it is no longer the *highest-priority* thread.
 
+A **multilevel feedback queue scheduler (MLFQS)** is a dynamic CPU‐scheduling algorithm that partitions ready processes into several queues of differing priorities and time-quantum lengths, and then dynamically promotes or demotes processes between these queues based on their observed CPU and I/O behavior.
 
 
 ## 2. Recent CPU
+
+### Initialization
+- Each thread's `recent_cpu` starts at 0
+- Initialized in `init_thread()` using `INT_TO_FP(0)`
+- Inherited from parent thread when creating new threads
+
+### Updates
+1. **Every Timer Tick:**
+   - Running thread's `recent_cpu` incremented by 1
+   - Except for idle thread which is skipped
+   - Code: `t->recent_cpu = FP_ADD_INT(t->recent_cpu, 1)`
+
+2. **Every Second (TIMER_FREQ ticks):**
+   - Updates `recent_cpu` for all threads using `calculate_recent_cpu()`
+   - Updates happen after load average calculation
+   - Updates are done using `thread_foreach()`
+
+### Calculation Formula
+```c
+recent_cpu = (2*load_avg)/(2*load_avg + 1) * recent_cpu + nice
+```
+- Uses fixed-point arithmetic for precise calculations
+- Components:
+  - Coefficient: `(2*load_avg)/(2*load_avg + 1)`
+  - Weighted previous value: `coefficient * recent_cpu`
+  - Nice adjustment: `+ nice`
+  
+### Usage
+- Used in priority calculations: `priority = PRI_MAX - (recent_cpu/4) - (nice*2)`
+- Exposed via `thread_get_recent_cpu()` which returns value * 100
+- Affects thread scheduling through priority system
+  
+### Key Functions
+1. `calculate_recent_cpu()`: Updates a thread's recent_cpu value
+2. `thread_get_recent_cpu()`: Returns current thread's recent_cpu * 100
+3. `thread_tick()`: Handles periodic updates
+   
+### Important Notes
+- All calculations done in fixed-point arithmetic
+- Updates happen at different frequencies (every tick vs. every second)
+- Idle thread is excluded from recent_cpu updates
+- System-wide load_avg affects all threads' recent_cpu values
 ## 3. Load Average
+
+
 ## 4. Calculating Priority
 The priority is calculated using the following formula:
-```
+```c
 priority = PRI_MAX - (recent_cpu / 4) - (nice * 2) 
 ``` 
 **Steps in `calculate_priority`:**
@@ -203,3 +248,108 @@ priority = PRI_MAX - (recent_cpu / 4) - (nice * 2)
 
   4. **Return Final Priority**
       - The resulting value becomes the thread's **new priority**
+  
+  5. **Update thread scheduling**
+  ```c
+   if (t == thread_current() && !list_empty(&ready_list) &&
+      t->priority < list_entry(list_front(&ready_list),
+                               struct thread, elem)
+                        ->priority)
+    thread_yield();
+  ```
+  The condition has **three** parts that must all be **true** for the thread to **yield**:
+
+ 1. `t == thread_current()` - Checks if we're dealing with the currently running thread
+ 2. `!list_empty(&ready_list)` - Verifies there are other threads waiting to run
+ 3. `t->priority < list_entry(...)` - Compares current thread's priority with the highest priority waiting thread
+
+The most complex part is the priority comparison using `list_entry()`. This macro (1) converts the front element of the ready list into a thread structure and (2) accesses its priority. The front of the ready list is used because in a priority scheduler, the **highest** priority thread should always be at the **front**.
+
+Advantages of this:
+- **It implements preemptive scheduling:** a thread will give up the CPU immediately if it becomes *lower* priority
+- **It's self-balancing:** no external scheduler is needed to force the context switch
+- It maintains **priority scheduling** invariants by ensuring **higher** priority threads always **run first**
+
+## Summary
+Here's a comprehensive explanation of the key components in the Multi-Level Feedback Queue Scheduler (MLFQS) implementation:
+
+### 1. Important Variables
+
+- `nice`: Integer value between -20 and 20 that affects thread priority
+- `recent_cpu`: Fixed-point number tracking CPU usage
+- `load_avg`: System-wide load average (fixed-point)
+- `priority`: Thread priority (0-63)
+
+### 2. Core Functions and Their Purpose
+
+#### Priority Calculation
+
+1. `calculate_priority(struct thread *t)`
+   - Formula: `priority = PRI_MAX - (recent_cpu/4) - (nice*2)`
+   - Ensures priority stays within [PRI_MIN, PRI_MAX]
+   - Called when nice value changes or periodically
+
+#### Nice Value Management
+
+1. `thread_set_nice(int new_nice)`
+   - Sets current thread's nice value
+   - Recalculates priority if MLFQS is enabled
+   - Yields CPU if needed
+
+2. `thread_get_nice(void)`
+   - Returns current thread's nice value
+
+#### Recent CPU Calculation
+
+1. `calculate_recent_cpu(struct thread *t)`
+   - Formula: `recent_cpu = (2*load_avg)/(2*load_avg + 1) * recent_cpu + nice`
+   - Uses fixed-point arithmetic
+   - Skips calculation for idle thread
+
+2. `thread_get_recent_cpu(void)`
+   - Returns current thread's recent_cpu * 100
+   - Provides 2 decimal places of precision
+
+#### Load Average Management
+
+1. `calculate_load_avg(void)`
+   - Formula: `load_avg = (59/60)*load_avg + (1/60)*ready_threads`
+   - Counts ready threads plus running thread (if not idle)
+   - Uses fixed-point arithmetic
+
+2. `thread_get_load_avg(void)`
+   - Returns system load average * 100
+
+### 3. Update Mechanisms
+
+#### Periodic Updates
+
+1. Every Timer Tick:
+   - Increment `recent_cpu` for running thread
+   - Update priorities if needed
+2. Every fourth tick:
+   - Recalculate priorities.
+3. Every Second (TIMER_FREQ ticks):
+   - Recalculate `load_avg`
+   - Update `recent_cpu` for all threads
+   - Recalculate priorities for all threads
+
+### 4. Thread Creation and Initialization
+
+1. Initial Thread:
+   - Starts with `nice` = 0
+   - `recent_cpu` = 0
+   - Default priority
+
+2. New Threads:
+   - Inherit `nice` value from parent
+   - Start with `recent_cpu` = 0
+   - Priority calculated based on `nice` value
+
+### 5. Fixed-Point Arithmetic
+
+- Used for precise calculations without floating-point operations
+- Implements `recent_cpu` and `load_avg` calculations
+- Converts between fixed-point and integer representations
+
+This implementation ensures fair CPU distribution while considering both long-term CPU usage (`recent_cpu`) and user-specified preferences (`nice` values).

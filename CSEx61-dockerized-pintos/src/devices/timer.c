@@ -225,7 +225,6 @@ timer_interrupt(struct intr_frame *args UNUSED)
 
     list_pop_front(&sleep_list); // Remove the sleeper from the sleep_list.
     sema_up(&s->sema); // Wake up the thread by signaling its semaphore.
-    thread_unblock(list_entry(e, struct thread, elem)); // Unblock the thread associated with the list element.
   }
 }
 ////////////////////////=== NEW ===//////////////////////////////////
