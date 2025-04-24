@@ -370,7 +370,32 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  enum intr_level old_level = intr_disable(); 
+  // @Magd-Elmohandes update original priority
+  thread_current ()->original_priority = new_priority;
+  
+  if(list_empty(&thread_current ()->donors))
+  {
+    thread_current ()->priority = new_priority;
+  }
+  else
+  {
+    struct list_elem *max_donor_elem = list_front(&thread_current()->donors);
+    struct thread *max_donor = list_entry(max_donor_elem, struct thread, elem);
+    if (new_priority > max_donor->priority)
+    {
+      thread_current ()->priority = new_priority;
+    }
+    else{
+      thread_current ()->priority = max_donor->priority;
+    }
+  }
+
+  if(thread_current()->waiting_on_lock != NULL)
+  {
+    priority_donation(thread_current()->waiting_on_lock);
+  }
+
 
   // @Ali Added Sort the ready list based on the new priority and preemption
   list_sort(&ready_list, priority_cmp, NULL);
@@ -384,6 +409,7 @@ thread_set_priority (int new_priority)
     }
   }
   
+  intr_set_level(old_level);
 }
 
 /* Returns the current thread's priority. */
@@ -512,6 +538,13 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
 
+  ////////////new//////////
+  
+  list_init(&(t->donors));
+  t->original_priority = priority;
+  t->waiting_on_lock = NULL;
+  
+  ////////////new//////////
   old_level = intr_disable ();
   /*============== NEW ===================*/
   //@Yousef added insertion of the initialized thread to all_list ordered 
