@@ -45,7 +45,6 @@ priority_cmp(const struct list_elem *a, const struct list_elem *b)
   return ea->priority > eb->priority;
 }
 
-<<<<<<< HEAD
 static bool
 cond_priority_cmp(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
@@ -62,8 +61,6 @@ cond_priority_cmp(const struct list_elem *a, const struct list_elem *b, void *au
   return thread_a->priority > thread_b->priority;
 }
 
-=======
->>>>>>> 7836075d1f099f5fc1a6ae9f47dd6e26868ad6e0
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
