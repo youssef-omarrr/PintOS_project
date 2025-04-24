@@ -45,6 +45,11 @@ priority_cmp(const struct list_elem *a, const struct list_elem *b)
   return ea->priority > eb->priority;
 }
 
+struct semaphore_elem {
+  struct list_elem elem;
+  struct semaphore semaphore;
+};
+
 static bool
 cond_priority_cmp(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
