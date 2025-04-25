@@ -98,7 +98,7 @@ void thread_init(void)
   list_init(&ready_list);
   list_init(&all_list);
 
-  load_avg = 0; // changed the location from thread_create to here///////////////////////change 1
+  load_avg = 0; // changed the location from thread_create to here///////////////////////change 1.1
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread();
@@ -494,7 +494,7 @@ int calculate_priority(struct thread *t)
                                struct thread, elem)
                         ->priority)
   {
-    if (!intr_context())////////////////////////////////change 2 yield in interrupt protection
+    if (!intr_context())////////////////////////////////change 2.1 yield in interrupt protection
     {
       thread_yield(); // Safe: it's not in interrupt context
     }
@@ -543,7 +543,7 @@ int thread_get_load_avg(void)
   return FP_TO_INT_NEAREST(load_avg * 100);
   ////////////////////////////New////////////////////////////////
 }
-fp_t calculate_load_avg(void) {
+fp_t calculate_load_avg(void) {////////////////////////////////////////change 3.1 updated for readability
   ASSERT(intr_get_level() == INTR_OFF);
 
   // Count threads in ready state
