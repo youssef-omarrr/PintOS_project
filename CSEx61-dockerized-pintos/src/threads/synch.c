@@ -239,16 +239,27 @@ lock_init (struct lock *lock)
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
-void
-lock_acquire (struct lock *lock)
-{
-  ASSERT (lock != NULL);
-  ASSERT (!intr_context ());
-  ASSERT (!lock_held_by_current_thread (lock));
-
-  sema_down (&lock->semaphore);
-  lock->holder = thread_current ();
-}
+   void lock_acquire(struct lock *lock)
+   {
+     ASSERT(lock != NULL);
+     ASSERT(!intr_context());
+     ASSERT(!lock_held_by_current_thread(lock));
+   
+     struct thread *current_thread = thread_current();
+     struct thread *holder_thread = lock->holder;
+   
+     if (holder_thread != NULL && current_thread->priority > holder_thread->priority)
+     {
+       current_thread->waiting_lock = lock;
+       list_insert_ordered(&holder_thread->donation_list, &current_thread->donation_elem, priority_cmp, NULL);
+       recalcualte_priority(holder_thread);
+      
+     }
+   
+     sema_down(&lock->semaphore);
+     lock->holder = current_thread;
+     current_thread->waiting_lock = NULL;
+   }
 
 /* Tries to acquires LOCK and returns true if successful or false
    on failure.  The lock must not already be held by the current
@@ -275,15 +286,40 @@ lock_try_acquire (struct lock *lock)
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to release a lock within an interrupt
    handler. */
-void
-lock_release (struct lock *lock) 
-{
-  ASSERT (lock != NULL);
-  ASSERT (lock_held_by_current_thread (lock));
-
-  lock->holder = NULL;
-  sema_up (&lock->semaphore);
-}
+   void lock_release(struct lock *lock) 
+   {
+     enum intr_level old_level;
+     struct thread *current_thread = thread_current();
+     struct list_elem *e;
+   
+     ASSERT(lock != NULL);
+     ASSERT(lock_held_by_current_thread(lock));
+   
+     old_level = intr_disable();
+   
+     /* Remove donations from threads waiting for this lock */
+     for (e = list_begin(&current_thread->donation_list); e != list_end(&current_thread->donation_list); ) 
+     {
+       struct thread *donor = list_entry(e, struct thread, donation_elem);
+       if (donor->waiting_lock == lock) 
+       {
+         donor->waiting_lock = NULL;
+         e = list_remove(e);  // remove and advance
+       }
+       else
+       {
+         e = list_next(e);  // just advance
+       }
+     }
+   
+     lock->holder = NULL;
+     sema_up(&lock->semaphore);
+   
+     recalcualte_priority(current_thread);
+     thread_yield_to_higher_priority();
+   
+     intr_set_level(old_level);
+   }
 
 /* Returns true if the current thread holds LOCK, false
    otherwise.  (Note that testing whether some other thread holds

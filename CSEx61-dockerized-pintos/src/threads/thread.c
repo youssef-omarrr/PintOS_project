@@ -90,13 +90,19 @@ static tid_t allocate_tid (void);
 bool
 priority_cmp(const struct list_elem *a, const struct list_elem *b)
 {
-
-
   const struct thread *ea = list_entry(a, struct thread, elem);
   const struct thread *eb = list_entry(b, struct thread, elem);
 
-
   return ea->priority > eb->priority;
+}
+
+bool
+priority_inverse_cmp(const struct list_elem *a, const struct list_elem *b)
+{
+  const struct thread *ea = list_entry(a, struct thread, elem);
+  const struct thread *eb = list_entry(b, struct thread, elem);
+
+  return ea->priority < eb->priority;
 }
 
 void
@@ -359,24 +365,102 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
-/* Sets the current thread's priority to NEW_PRIORITY. */
-void
-thread_set_priority (int new_priority) 
+static bool
+donated_lower_priority (const struct list_elem *a_,
+                        const struct list_elem *b_,
+                        void *aux UNUSED) 
 {
-  thread_current ()->priority = new_priority;
+  const struct thread *a = list_entry (a_, struct thread, donation_elem);
+  const struct thread *b = list_entry (b_, struct thread, donation_elem);
 
-  // @Ali Added Sort the ready list based on the new priority and preemption
-  list_sort(&ready_list, priority_cmp, NULL);
+  return a->priority < b->priority;
+}
 
+void thread_yield_to_higher_priority(void)
+{
+  
   if (!list_empty(&ready_list))
   {
-    struct thread *next_thread = list_entry(list_front(&ready_list), struct thread, elem);
-    if (next_thread->priority > thread_get_priority())
+    struct thread *cur = thread_current();
+    struct thread *max = list_entry(list_max(&ready_list, priority_cmp, NULL), struct thread, elem);
+    
+    if (max->priority > cur->priority)
     {
-      thread_yield();
+        thread_yield();
     }
   }
-  
+
+}
+
+
+void recalcualte_priority(struct thread *t)
+{
+  struct thread *current = t;
+  struct list visited;
+  list_init(&visited);
+
+  while (current != NULL)
+  {
+    // Cycle check
+    struct list_elem *e;
+    bool cycle = false;
+    for (e = list_begin(&visited); e != list_end(&visited); e = list_next(e))
+    {
+      if (list_entry(e, struct thread, allelem) == current)
+      {
+        cycle = true;
+        break;
+      }
+    }
+
+    if (cycle) break;
+
+    list_push_back(&visited, &current->allelem);
+
+    int old_priority = current->priority;
+    int default_priority = current->original_priority;
+    int donation = PRI_MIN;
+
+    if (!list_empty(&current->donation_list))
+    {
+      donation = list_entry(
+        list_max(&current->donation_list, priority_cmp, NULL),
+        struct thread,
+        donation_elem
+      )->priority;
+    }
+
+    current->priority = donation > default_priority ? donation : default_priority;
+
+    if (current->priority > old_priority &&
+        current->waiting_lock != NULL &&
+        current->waiting_lock->holder != NULL)
+    {
+      current = current->waiting_lock->holder;
+    }
+    else
+    {
+      break;
+    }
+  }
+
+  // Clean up (optional if allelem is reused)
+  while (!list_empty(&visited))
+  {
+    list_pop_front(&visited);
+  }
+}
+/* Sets the current thread's priority to NEW_PRIORITY. */
+
+void thread_set_priority(int new_priority)
+{
+  struct thread *cur = thread_current();
+  cur->original_priority = new_priority;
+  cur->priority = new_priority;
+  enum intr_level old_level = intr_disable();
+  recalcualte_priority(cur);
+  thread_yield_to_higher_priority();
+  intr_set_level(old_level);
 }
 
 /* Returns the current thread's priority. */
@@ -503,12 +587,17 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->original_priority = priority;
+  t->waiting_lock = NULL;
+
+  list_init(&t->donation_list);
+
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();
   /*============== NEW ===================*/
   //@Yousef added insertion of the initialized thread to all_list ordered 
-  list_insert_ordered(&all_list, &t->allelem, priority_cmp, NULL);
+  list_push_back(&all_list, &t->allelem);
   /*============== NEW ===================*/
   // list_push_back (&all_list, &t->allelem);
   intr_set_level (old_level);
