@@ -91,11 +91,11 @@ bool
 priority_cmp(const struct list_elem *a, const struct list_elem *b)
 {
 
-  // Retrieve the sleep_element structures from the list elements.
+
   const struct thread *ea = list_entry(a, struct thread, elem);
   const struct thread *eb = list_entry(b, struct thread, elem);
 
-  // Compare the wakeup_tick values to determine the order.
+
   return ea->priority > eb->priority;
 }
 
@@ -260,13 +260,6 @@ thread_unblock (struct thread *t)
 
   // @Ali Added the Cmparator function for priority
   list_insert_ordered(&ready_list, &t->elem, priority_cmp, NULL);
-  
-  // If the unblocked thread has higher priority, yield
-  if (!intr_context() && thread_current() != idle_thread && 
-  t->priority > thread_current()->priority)
-  {
-      thread_yield();
-  }
   
   t->status = THREAD_READY;
   intr_set_level (old_level);
