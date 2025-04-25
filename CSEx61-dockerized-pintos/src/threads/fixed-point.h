@@ -18,8 +18,8 @@ typedef int fp_t; // Use 32-bit for Pintos compatibility
 #define FP_SUB(x, y) ((x) - (y))                             // Fixed - Fixed
 #define FP_MULT(x, y) ((fp_t)(((int64_t)(x) * (y)) / SCALE)) // Fixed × Fixed
 #define FP_DIV(x, y) ((fp_t)(((int64_t)(x) * SCALE) / (y)))  // Fixed ÷ Fixed
-#define FP_PLUS_INT(x, y) ((x) + (fp_t)(y) * SCALE)          // Fixed + Integer
-#define FP_MINUS_INT(x, y) ((x) - (fp_t)(y) * SCALE)         // Fixed - Integer
+#define FP_PLUS_INT(x, y) ((x) + INT_TO_FP(y))               // Fixed + Integer
+#define FP_MINUS_INT(x, y) ((x) - INT_TO_FP(y))              // Fixed - Integer
 #define FP_MULT_INT(x, n) ((x) * (n))                        // Fixed * Integer
 #define FP_DIV_INT(x, n) ((x) / (n))                         // Fixed / Integer
 
