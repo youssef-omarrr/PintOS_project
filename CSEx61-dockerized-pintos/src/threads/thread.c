@@ -87,7 +87,7 @@ static tid_t allocate_tid (void);
    finishes. */
 
 // @Ali Added the Cmparator function for priority    
-static bool
+bool
 priority_cmp(const struct list_elem *a, const struct list_elem *b)
 {
 
