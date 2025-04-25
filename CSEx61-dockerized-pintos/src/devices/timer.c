@@ -133,7 +133,9 @@ void timer_sleep(int64_t ticks_to_sleep)
   enum intr_level old_level = intr_disable(); // Disable interrupts to modify the shared sleep_list safely.
   /* Insert in sorted order by wakeup_tick. */
   list_insert_ordered(&sleep_list, &sleeper.element, wakeup_cmp, NULL); // Add the sleeper to the sleep_list in sorted order.
-  intr_set_level(old_level);                                            // Restore the previous interrupt level.
+
+  
+  intr_set_level(old_level); // Restore the previous interrupt level.
 
   /* Block until timer_interrupt ups our semaphore. */
   sema_down(&sleeper.sema); // Block the thread until it is woken up by the timer interrupt.
@@ -211,6 +213,7 @@ timer_interrupt(struct intr_frame *args UNUSED)
   ticks++; // Increment the global tick count.
   thread_tick(); // Notify the scheduler that a timer tick has occurred.
 
+  enum intr_level old_level = intr_disable();
   // Wake up as many sleepers as are due.
   while (!list_empty(&sleep_list)) // Check if there are any sleeping threads in the sleep_list.
   {
@@ -221,7 +224,9 @@ timer_interrupt(struct intr_frame *args UNUSED)
       break;
 
     list_pop_front(&sleep_list); // Remove the sleeper from the sleep_list.
-    sema_up(&s->sema); // Wake up the thread by signaling its semaphore.
+    intr_set_level(old_level);  // Re-enable interrupts before waking thread
+    sema_up(&s->sema);// Wake up the thread by signaling its semaphore.
+    old_level = intr_disable();  // Disable again for next iteration
   }
 }
 ////////////////////////=== NEW ===//////////////////////////////////
