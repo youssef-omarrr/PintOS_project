@@ -134,7 +134,6 @@ void timer_sleep(int64_t ticks_to_sleep)
   /* Insert in sorted order by wakeup_tick. */
   list_insert_ordered(&sleep_list, &sleeper.element, wakeup_cmp, NULL); // Add the sleeper to the sleep_list in sorted order.
 
-  thread_block(); // Set the thread's state to BLOCKED.
 
   intr_set_level(old_level); // Restore the previous interrupt level.
 
@@ -214,6 +213,7 @@ timer_interrupt(struct intr_frame *args UNUSED)
   ticks++; // Increment the global tick count.
   thread_tick(); // Notify the scheduler that a timer tick has occurred.
 
+  enum intr_level old_level = intr_disable();
   // Wake up as many sleepers as are due.
   while (!list_empty(&sleep_list)) // Check if there are any sleeping threads in the sleep_list.
   {
@@ -224,7 +224,9 @@ timer_interrupt(struct intr_frame *args UNUSED)
       break;
 
     list_pop_front(&sleep_list); // Remove the sleeper from the sleep_list.
-    sema_up(&s->sema); // Wake up the thread by signaling its semaphore.
+    intr_set_level(old_level);  // Re-enable interrupts before waking thread
+    sema_up(&s->sema);// Wake up the thread by signaling its semaphore.
+    old_level = intr_disable();  // Disable again for next iteration
   }
 }
 ////////////////////////=== NEW ===//////////////////////////////////
