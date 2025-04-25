@@ -393,63 +393,31 @@ void thread_yield_to_higher_priority(void)
 }
 
 
-void recalcualte_priority(struct thread *t)
+void
+recalculate_priority(struct thread *t) 
 {
-  struct thread *current = t;
-  struct list visited;
-  list_init(&visited);
+  int old_priority = t->priority;
+  int default_priority = t->original_priority;
+  int donation = PRI_MIN;
 
-  while (current != NULL)
-  {
-    // Cycle check
-    struct list_elem *e;
-    bool cycle = false;
-    for (e = list_begin(&visited); e != list_end(&visited); e = list_next(e))
-    {
-      if (list_entry(e, struct thread, allelem) == current)
-      {
-        cycle = true;
-        break;
-      }
-    }
-
-    if (cycle) break;
-
-    list_push_back(&visited, &current->allelem);
-
-    int old_priority = current->priority;
-    int default_priority = current->original_priority;
-    int donation = PRI_MIN;
-
-    if (!list_empty(&current->donation_list))
-    {
-      donation = list_entry(
-        list_max(&current->donation_list, priority_cmp, NULL),
-        struct thread,
-        donation_elem
-      )->priority;
-    }
-
-    current->priority = donation > default_priority ? donation : default_priority;
-
-    if (current->priority > old_priority &&
-        current->waiting_lock != NULL &&
-        current->waiting_lock->holder != NULL)
-    {
-      current = current->waiting_lock->holder;
-    }
-    else
-    {
-      break;
-    }
+  if (!list_empty(&t->donation_list)) {
+    donation = list_entry(
+      list_max(&t->donation_list, donated_lower_priority, NULL),
+      struct thread,
+      donation_elem
+    )->priority;
   }
 
-  // Clean up (optional if allelem is reused)
-  while (!list_empty(&visited))
-  {
-    list_pop_front(&visited);
+  t->priority = donation > default_priority ? donation : default_priority;
+
+  // Propagate donation if necessary
+  if (t->priority > old_priority &&
+      t->waiting_lock != NULL &&
+      t->waiting_lock->holder != NULL) {
+    recalculate_priority(t->waiting_lock->holder);
   }
 }
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 
 void thread_set_priority(int new_priority)
@@ -458,7 +426,7 @@ void thread_set_priority(int new_priority)
   cur->original_priority = new_priority;
   cur->priority = new_priority;
   enum intr_level old_level = intr_disable();
-  recalcualte_priority(cur);
+  recalculate_priority(cur);
   thread_yield_to_higher_priority();
   intr_set_level(old_level);
 }

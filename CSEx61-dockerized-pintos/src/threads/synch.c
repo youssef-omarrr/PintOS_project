@@ -248,12 +248,13 @@ lock_init (struct lock *lock)
      struct thread *current_thread = thread_current();
      struct thread *holder_thread = lock->holder;
    
-     if (holder_thread != NULL && current_thread->priority > holder_thread->priority)
+     current_thread->waiting_lock = lock;
+
+     if (holder_thread != NULL)
      {
-       current_thread->waiting_lock = lock;
-       list_insert_ordered(&holder_thread->donation_list, &current_thread->donation_elem, priority_cmp, NULL);
-       recalcualte_priority(holder_thread);
-      
+        if ( current_thread->priority > holder_thread->priority)
+            list_push_back(&holder_thread->donation_list, &current_thread->donation_elem);
+       recalculate_priority(holder_thread);
      }
    
      sema_down(&lock->semaphore);
@@ -315,7 +316,7 @@ lock_try_acquire (struct lock *lock)
      lock->holder = NULL;
      sema_up(&lock->semaphore);
    
-     recalcualte_priority(current_thread);
+     recalculate_priority(current_thread);
      thread_yield_to_higher_priority();
    
      intr_set_level(old_level);
