@@ -109,6 +109,7 @@ struct thread
    int original_priority;                      // To remember the original priority
    struct list donors;                         // List of donors 
    struct lock *waiting_on_lock;               // Lock the thread is waiting on
+   struct list_elem donors_elem;
 
    ///////////====== NEW =========//////////////
    //  Niceness value [-20:20]
@@ -124,7 +125,7 @@ struct thread
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
 
-static bool priority_cmp(const struct list_elem *, const struct list_elem *);
+bool priority_cmp(const struct list_elem *, const struct list_elem *);
 void thread_init (void);
 void thread_start (void);
 
@@ -156,11 +157,6 @@ int calculate_priority(struct thread *t);
 void calculate_recent_cpu(struct thread *t);
 fp_t calculate_load_avg(void);
 
-/* Compares the priority of two threads for ordering in ready list.
-   Returns true if a should be ordered before b. */
-bool thread_priority_compare(const struct list_elem *a,
-                             const struct list_elem *b,
-                             void *aux UNUSED);
 //////////=== NEW ===////////////
 
 int thread_get_nice(void);
