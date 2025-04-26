@@ -399,93 +399,6 @@ void thread_foreach(thread_action_func *func, void *aux)
   }
 }
 
-static bool
-donated_lower_priority(const struct list_elem *a_,
-                       const struct list_elem *b_,
-                       void *aux UNUSED)
-{
-  const struct thread *a = list_entry(a_, struct thread, donor_elem);
-  const struct thread *b = list_entry(b_, struct thread, donor_elem);
-
-  return a->priority < b->priority;
-}
-
-static bool
-donated_higher_priority(const struct list_elem *a_,
-                        const struct list_elem *b_,
-                        void *aux UNUSED)
-{
-  const struct thread *a = list_entry(a_, struct thread, donor_elem);
-  const struct thread *b = list_entry(b_, struct thread, donor_elem);
-
-  return a->priority > b->priority;
-}
-/* If the ready list contains a thread with a higher priority,
-   yields to it. */
-void thread_yield_to_higher_priority(void)
-{
-  enum intr_level old_level = intr_disable();
-  if (!list_empty(&ready_list))
-  {
-    struct thread *cur = thread_current();
-    struct thread *max = list_entry(list_max(&ready_list,
-                                             thread_lower_priority, NULL),
-                                    struct thread, elem);
-    if (max->priority > cur->priority)
-    {
-      if (intr_context())
-        intr_yield_on_return();
-      else
-        thread_yield();
-    }
-  }
-  intr_set_level(old_level);
-}
-
-/*  Recomputes T's priority in terms of its original priority and
-    its donors' priorities, if any,
-    and cascades the donation as necessary. */
-void thread_recompute_priority(struct thread *t)
-{
-  int old_priority = t->priority;
-  int default_priority = t->original_priority;
-  int donation = PRI_MIN;
-
-  // Handle MLFQS priority calculation
-  if (thread_mlfqs)
-  {
-    default_priority = PRI_MAX - FP_TO_INT_NEAREST(t->recent_cpu) / 4 - t->nice * 2;
-    if (default_priority < PRI_MIN)
-      default_priority = PRI_MIN;
-    else if (default_priority > PRI_MAX)
-      default_priority = PRI_MAX;
-  }
-
-  // Find highest priority donor if any
-  if (!list_empty(&t->donors))
-    donation = list_entry(list_max(&t->donors, donated_lower_priority, NULL),
-                          struct thread, donor_elem)
-                   ->priority;
-
-  // Set priority to the higher of default and donation
-  t->priority = donation > default_priority ? donation : default_priority;
-
-  // Propagate donation if priority increased and thread is waiting on a lock
-  if (t->priority > old_priority && t->waiting_lock != NULL &&
-      t->waiting_lock->holder != NULL)
-  {
-    thread_recompute_priority(t->waiting_lock->holder);
-  }
-}
-
-static void
-recompute_priority_chain(void)
-{
-  enum intr_level old_level = intr_disable();
-  thread_recompute_priority(thread_current());
-  thread_yield_to_higher_priority();
-  intr_set_level(old_level);
-}
 
 static bool
 donated_lower_priority (const struct list_elem *a_,
@@ -579,6 +492,7 @@ int calculate_priority(struct thread *t)
 
   // If this is the current thread and it's no longer the highest priority,
   // yield. Changes were made to "thread_unblock()" and "thread_yield()" to make the "read_list" ordered
+  list_sort(&ready_list, priority_cmp, NULL);
   if (t == thread_current() && !list_empty(&ready_list) &&
       t->priority < list_entry(list_front(&ready_list),
                                struct thread, elem)

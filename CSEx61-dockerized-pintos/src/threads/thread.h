@@ -96,12 +96,6 @@ struct thread
    /* Shared between thread.c and synch.c. */
    struct list_elem elem; /* List element. */
 
-   /* Donation */
-   int original_priority;       /* Original priority. */
-   struct list donors;          /* List of donors. */
-   struct lock *waiting_lock;   /* Lock that the thread is waiting for. */
-   struct list_elem donor_elem; /* List element for donor list. */
-
    /* mlfqs */
    int nice;        /* Niceness value. [-20: 20] */
    fp_t recent_cpu; /* Recent CPU usage. */
