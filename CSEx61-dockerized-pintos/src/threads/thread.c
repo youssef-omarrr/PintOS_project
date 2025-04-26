@@ -116,7 +116,6 @@ void thread_start(void)
   sema_init(&idle_started, 0);
   thread_create("idle", PRI_MIN, idle, &idle_started);
 
-
   /* Start preemptive thread scheduling. */
   intr_enable();
 
@@ -144,14 +143,19 @@ void thread_tick(void)
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return();
 
+  ////////////////////////// NEW //////////////////////////
+
   if (thread_mlfqs)
   {
+    // Increment recent_cpu for running thread if not idle
     if (t != idle_thread)
       t->recent_cpu = FP_PLUS_INT(t->recent_cpu, 1);
 
+    // Increment recent_cpu for running thread if not idle
     if (timer_ticks() % 4 == 0)
       thread_foreach(&calculate_priority, NULL);
 
+    // Increment recent_cpu for running thread if not idle
     if (timer_ticks() % TIMER_FREQ == 0)
     {
       load_avg = calculate_load_avg();
@@ -160,6 +164,7 @@ void thread_tick(void)
     }
   }
 }
+////////////////////////// NEW //////////////////////////
 
 /* Prints thread statistics. */
 void thread_print_stats(void)
@@ -202,9 +207,11 @@ tid_t thread_create(const char *name, int priority,
   /* Initialize thread. */
   init_thread(t, name, priority);
 
+  ////////////////////////// NEW //////////////////////////
   // Inherit the niceness value and recent_cpu from the parent thread
   t->nice = thread_current()->nice;
   t->recent_cpu = thread_current()->recent_cpu;
+  ////////////////////////// NEW //////////////////////////
 
   tid = t->tid = allocate_tid();
 
@@ -275,7 +282,11 @@ void thread_unblock(struct thread *t)
 
   old_level = intr_disable();
   ASSERT(t->status == THREAD_BLOCKED);
-  list_push_back(&ready_list, &t->elem);
+  /////////////////======== NEW =======//////////////////
+  // Use list_insert_ordered to maintain priority ordering
+  list_insert_ordered(&ready_list, &t->elem,
+                      (list_less_func *)&thread_priority_compare, NULL);
+  /////////////////======== NEW =======//////////////////
   t->status = THREAD_READY;
   intr_set_level(old_level);
 }
@@ -343,7 +354,11 @@ void thread_yield(void)
 
   old_level = intr_disable();
   if (cur != idle_thread)
-    list_push_back(&ready_list, &cur->elem);
+    /////////////////======== NEW =======//////////////////
+    // Use list_insert_ordered to maintain priority ordering
+    list_insert_ordered(&ready_list, &cur->elem,
+                        (list_less_func *)&thread_priority_compare, NULL);
+  /////////////////======== NEW =======//////////////////
   cur->status = THREAD_READY;
   schedule();
   intr_set_level(old_level);
@@ -494,7 +509,7 @@ int calculate_priority(struct thread *t)
                                struct thread, elem)
                         ->priority)
   {
-    if (!intr_context())////////////////////////////////change 2.1 yield in interrupt protection
+    if (!intr_context()) ////////////////////////////////change 2.1 yield in interrupt protection
     {
       thread_yield(); // Safe: it's not in interrupt context
     }
@@ -540,31 +555,33 @@ int thread_get_nice(void)
 int thread_get_load_avg(void)
 {
   ////////////////////////////New////////////////////////////////
-  return FP_TO_INT_NEAREST(load_avg * 100);
+  ASSERT(thread_mlfqs);
+  return FP_TO_INT_NEAREST(FP_MULT_INT(load_avg, 100));
   ////////////////////////////New////////////////////////////////
 }
-fp_t calculate_load_avg(void) {////////////////////////////////////////change 3.1 updated for readability
+fp_t calculate_load_avg(void)
+{ ////////////////////////////////////////change 3.1 updated for readability
   ASSERT(intr_get_level() == INTR_OFF);
 
   // Count threads in ready state
   int ready_threads = list_size(&ready_list);
-  
+
   // Count current thread only if it's running and not idle
-  struct thread *current = thread_current();
-  if (current != idle_thread && current->status == THREAD_RUNNING) {
+  if (thread_current() != idle_thread)
+  {
     ready_threads++;
   }
-  
-  // Calculate: load_avg = (59/60)*load_avg + (1/60)*ready_threads
-  fp_t decay = FP_DIV(INT_TO_FP(59), INT_TO_FP(60));
-  fp_t new_load = FP_ADD(
-    FP_MULT(decay, load_avg),
-    FP_DIV(INT_TO_FP(ready_threads), INT_TO_FP(60))
-  );
 
-  return new_load;
+  // load_avg = (59/60)*load_avg + (1/60)*ready_threads
+  fp_t coeff_old = FP_DIV(INT_TO_FP(59), INT_TO_FP(60));
+  fp_t coeff_new = FP_DIV(INT_TO_FP(1), INT_TO_FP(60));
+
+  load_avg = FP_ADD(
+      FP_MULT(coeff_old, load_avg),
+      FP_MULT_INT(coeff_new, ready_threads));
+
+  return load_avg;
 }
-
 
 /* Returns 100 times the current thread's recent_cpu value.
   This function is used to query the recent CPU usage of the currently running thread.
@@ -819,3 +836,13 @@ allocate_tid(void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof(struct thread, stack);
+
+// Used for the ordering of the ready_list
+bool thread_priority_compare(const struct list_elem *a,
+                             const struct list_elem *b,
+                             void *aux UNUSED)
+{
+  struct thread *ta = list_entry(a, struct thread, elem);
+  struct thread *tb = list_entry(b, struct thread, elem);
+  return ta->priority > tb->priority;
+}
